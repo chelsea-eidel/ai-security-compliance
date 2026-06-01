@@ -1,0 +1,291 @@
+# Compliance Rules Configuration
+# Each rule maps to detection logic and remediation strategy.
+# Rules are grouped by category.
+
+categories:
+
+  # ── Secrets & Credentials ────────────────────────────────
+  secrets:
+    enabled: true
+    rules:
+      - id: SEC001
+        name: "Hardcoded secrets in source"
+        severity: critical
+        description: "API keys, passwords, tokens committed to source code"
+        detection:
+          tool: gitleaks
+          patterns:
+            - "(?i)(api[_-]?key|apikey)\\s*[:=]\\s*['\"][A-Za-z0-9]{16,}"
+            - "(?i)(secret|password|passwd|pwd)\\s*[:=]\\s*['\"][^'\"]{8,}"
+            - "(?i)(aws_access_key_id|aws_secret_access_key)\\s*[:=]"
+            - "ghp_[A-Za-z0-9]{36}"
+            - "sk-[A-Za-z0-9]{32,}"
+        remediation:
+          strategy: "replace_with_env_var"
+          ai_assisted: true
+
+      - id: SEC002
+        name: "Secrets in config files"
+        severity: critical
+        detection:
+          tool: custom
+          file_patterns: ["*.yaml", "*.yml", "*.json", "*.toml", "*.ini", "*.cfg", "*.conf"]
+          patterns:
+            - "(?i)(password|secret|token|key)\\s*[:=]\\s*['\"]?[A-Za-z0-9+/]{16,}"
+        remediation:
+          strategy: "externalize_to_vault"
+          ai_assisted: true
+
+  # ── Dependency Vulnerabilities ───────────────────────────
+  dependencies:
+    enabled: true
+    rules:
+      - id: DEP001
+        name: "Known vulnerable dependencies"
+        severity: high
+        detection:
+          tool: trivy
+          scan_type: "fs"
+        remediation:
+          strategy: "upgrade_dependency"
+          ai_assisted: false
+
+      - id: DEP002
+        name: "Unpinned dependency versions"
+        severity: medium
+        detection:
+          tool: custom
+          file_patterns:
+            - "requirements.txt"
+            - "package.json"
+            - "Gemfile"
+            - "go.mod"
+          patterns:
+            - "^[a-zA-Z][a-zA-Z0-9_-]*$"  # no version specifier
+            - "\"\\*\""                      # wildcard version
+            - "\">=\""                       # unbounded lower bound only
+        remediation:
+          strategy: "pin_versions"
+          ai_assisted: true
+
+      - id: DEP003
+        name: "No lock file present"
+        severity: medium
+        detection:
+          tool: custom
+          check: "missing_lockfile"
+        remediation:
+          strategy: "generate_lockfile"
+          ai_assisted: false
+
+  # ── Container Security ───────────────────────────────────
+  containers:
+    enabled: true
+    rules:
+      - id: CTR001
+        name: "Container running as root"
+        severity: high
+        detection:
+          tool: custom
+          file_patterns: ["Dockerfile", "*.dockerfile"]
+          anti_patterns:
+            - "USER\\s+\\S+"  # must be present
+        remediation:
+          strategy: "add_non_root_user"
+          ai_assisted: true
+
+      - id: CTR002
+        name: "Unpinned base image"
+        severity: medium
+        detection:
+          tool: custom
+          file_patterns: ["Dockerfile", "*.dockerfile"]
+          patterns:
+            - "^FROM\\s+\\S+:latest"
+            - "^FROM\\s+[^:@\\s]+\\s"  # no tag at all
+        remediation:
+          strategy: "pin_base_image"
+          ai_assisted: true
+
+      - id: CTR003
+        name: "Secrets in Docker build"
+        severity: critical
+        detection:
+          tool: custom
+          file_patterns: ["Dockerfile", "*.dockerfile"]
+          patterns:
+            - "(?i)(ENV|ARG)\\s+(PASSWORD|SECRET|TOKEN|API_KEY)"
+            - "COPY.*\\.(env|key|pem|crt)"
+        remediation:
+          strategy: "use_build_secrets"
+          ai_assisted: true
+
+  # ── Infrastructure as Code ──────────────────────────────
+  iac:
+    enabled: true
+    rules:
+      - id: IAC001
+        name: "Open security groups (0.0.0.0/0)"
+        severity: high
+        detection:
+          tool: semgrep
+          rule_id: "terraform.aws.security.open-ingress"
+          file_patterns: ["*.tf", "*.tf.json"]
+        remediation:
+          strategy: "restrict_cidr"
+          ai_assisted: true
+
+      - id: IAC002
+        name: "Unencrypted storage"
+        severity: high
+        detection:
+          tool: semgrep
+          file_patterns: ["*.tf", "*.tf.json", "*.yaml"]
+          patterns:
+            - "encrypted\\s*=\\s*false"
+            - "encryption_disabled"
+        remediation:
+          strategy: "enable_encryption"
+          ai_assisted: true
+
+      - id: IAC003
+        name: "Public S3 buckets"
+        severity: critical
+        detection:
+          tool: custom
+          file_patterns: ["*.tf"]
+          patterns:
+            - "acl\\s*=\\s*\"public-read\""
+            - "acl\\s*=\\s*\"public-read-write\""
+            - "block_public_acls\\s*=\\s*false"
+        remediation:
+          strategy: "make_private"
+          ai_assisted: true
+
+  # ── Code Security ────────────────────────────────────────
+  code:
+    enabled: true
+    rules:
+      - id: CODE001
+        name: "SQL injection vulnerability"
+        severity: critical
+        detection:
+          tool: semgrep
+          rulesets: ["p/owasp-top-ten"]
+        remediation:
+          strategy: "parameterize_queries"
+          ai_assisted: true
+
+      - id: CODE002
+        name: "Cross-site scripting (XSS)"
+        severity: high
+        detection:
+          tool: semgrep
+          rulesets: ["p/xss"]
+        remediation:
+          strategy: "sanitize_output"
+          ai_assisted: true
+
+      - id: CODE003
+        name: "Insecure deserialization"
+        severity: high
+        detection:
+          tool: semgrep
+          rulesets: ["p/insecure-deserialization"]
+        remediation:
+          strategy: "safe_deserialization"
+          ai_assisted: true
+
+      - id: CODE004
+        name: "Insecure TLS configuration"
+        severity: high
+        detection:
+          tool: custom
+          patterns:
+            - "(?i)ssl_verify\\s*=\\s*false"
+            - "(?i)verify\\s*=\\s*false"
+            - "(?i)NODE_TLS_REJECT_UNAUTHORIZED\\s*=\\s*['\"]?0"
+            - "InsecureSkipVerify:\\s*true"
+        remediation:
+          strategy: "enable_tls_verify"
+          ai_assisted: true
+
+  # ── CI/CD Security ──────────────────────────────────────
+  cicd:
+    enabled: true
+    rules:
+      - id: CICD001
+        name: "Overly permissive GitHub Actions"
+        severity: high
+        detection:
+          tool: custom
+          file_patterns: [".github/workflows/*.yml", ".github/workflows/*.yaml"]
+          patterns:
+            - "permissions:\\s*write-all"
+            - "pull_request_target"
+        remediation:
+          strategy: "restrict_permissions"
+          ai_assisted: true
+
+      - id: CICD002
+        name: "Unpinned GitHub Actions"
+        severity: medium
+        detection:
+          tool: custom
+          file_patterns: [".github/workflows/*.yml", ".github/workflows/*.yaml"]
+          patterns:
+            - "uses:\\s+[^@]+@(main|master|latest)"
+            - "uses:\\s+[^@]+@v\\d+\\s"  # major-only tag
+        remediation:
+          strategy: "pin_action_sha"
+          ai_assisted: true
+
+      - id: CICD003
+        name: "Secrets exposed in CI logs"
+        severity: critical
+        detection:
+          tool: custom
+          file_patterns: [".github/workflows/*.yml", ".gitlab-ci.yml", "Jenkinsfile"]
+          patterns:
+            - "echo.*\\$\\{.*SECRET"
+            - "echo.*\\$\\{.*TOKEN"
+            - "echo.*\\$\\{.*PASSWORD"
+        remediation:
+          strategy: "mask_secrets"
+          ai_assisted: true
+
+  # ── Compliance Configs ──────────────────────────────────
+  compliance:
+    enabled: true
+    rules:
+      - id: CMP001
+        name: "Missing security policy"
+        severity: low
+        detection:
+          tool: custom
+          check: "missing_file"
+          files: ["SECURITY.md", ".github/SECURITY.md"]
+        remediation:
+          strategy: "generate_security_policy"
+          ai_assisted: true
+
+      - id: CMP002
+        name: "Missing branch protection"
+        severity: medium
+        detection:
+          tool: api
+          check: "branch_protection"
+        remediation:
+          strategy: "enable_branch_protection"
+          ai_assisted: false
+
+      - id: CMP003
+        name: "Missing code owners"
+        severity: low
+        detection:
+          tool: custom
+          check: "missing_file"
+          files: ["CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"]
+        remediation:
+          strategy: "generate_codeowners"
+          ai_assisted: true

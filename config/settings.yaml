@@ -1,0 +1,110 @@
+# Global settings for Security Compliance AI
+# -------------------------------------------
+
+# Claude API configuration
+ai:
+  model: "claude-sonnet-4-6"
+  max_tokens: 8192
+  # Set ANTHROPIC_API_KEY env var
+
+# Repository discovery
+repos:
+  # Source: "github", "gitlab", "local", "file"
+  source: "github"
+  # GitHub org or GitLab group
+  org: "your-org"
+  # Filter repos by topic/language/pattern
+  filters:
+    languages: []           # e.g. ["python", "javascript", "go"]
+    name_patterns: ["*"]    # glob patterns
+    exclude_patterns: ["*-archive", "*-deprecated"]
+    exclude_archived: true
+  # For source: "file", path to newline-delimited repo list
+  repo_list_file: ""
+  # For source: "local", base directory containing repos
+  local_base_dir: ""
+
+# Scanning
+scan:
+  # Max repos to scan in parallel
+  parallelism: 10
+  # Clone depth (0 = full)
+  clone_depth: 1
+  # Temp directory for clones
+  work_dir: "/tmp/security-compliance-ai"
+  # Tools to run
+  tools:
+    semgrep: true
+    trivy: true
+    gitleaks: true
+    custom_rules: true
+  # Severity threshold: critical, high, medium, low
+  min_severity: "medium"
+
+# Remediation
+remediation:
+  # Auto-apply fixes (false = generate PRs for review)
+  auto_apply: false
+  # Create branches for fixes
+  branch_prefix: "security-fix/"
+  # Create PRs automatically
+  create_prs: true
+  # Max fixes per repo per run
+  max_fixes_per_repo: 20
+  # Require validation before PR
+  require_validation: true
+
+# Validation
+validation:
+  # Run existing tests
+  run_tests: true
+  # Test commands to try (in order)
+  test_commands:
+    - "make test"
+    - "npm test"
+    - "pytest"
+    - "go test ./..."
+    - "mvn test"
+    - "gradle test"
+  # Build verification
+  verify_build: true
+  build_commands:
+    - "make build"
+    - "npm run build"
+    - "go build ./..."
+    - "mvn package -DskipTests"
+    - "gradle build -x test"
+  # Timeout per command (seconds)
+  timeout: 300
+  # Fix verification
+  # Run strategy-specific assertions + targeted re-scan after each fix (fast).
+  verify_fixes: true
+  # Run a full-repo re-scan at the end of a batch of fixes (slow; catches
+  # cross-file regressions that the targeted re-scan misses).
+  full_rescan: false
+  # Snapshot test/build status BEFORE any fix is applied, then only flag
+  # commands that regressed from passing -> failing. Pre-existing failures
+  # are excluded from regression checks so they don't block fixes.
+  baseline_existing: true
+  # Warn (don't fail) if any single validation step exceeds this wall-clock
+  # budget. Useful for spotting slow re-scans/tests during tuning.
+  step_budget_s: 60
+
+# Dashboard
+dashboard:
+  host: "0.0.0.0"
+  port: 8080
+  # Path to persist scan results
+  data_dir: "./data"
+
+# Notifications
+notifications:
+  # Slack webhook URL
+  slack_webhook: ""
+  # Email settings
+  email:
+    enabled: false
+    smtp_host: ""
+    smtp_port: 587
+    from_address: ""
+    to_addresses: []

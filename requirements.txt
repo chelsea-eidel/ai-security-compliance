@@ -1,0 +1,26 @@
+# Core
+anthropic>=0.42.0
+pyyaml>=6.0
+click>=8.1
+rich>=13.0
+jinja2>=3.1
+
+# Scanning
+semgrep>=1.50.0
+
+# Dashboard
+flask>=3.0
+flask-socketio>=5.3
+
+# Git operations
+gitpython>=3.1
+
+# Validation
+pytest>=8.0
+
+# Reporting
+tabulate>=0.9
+matplotlib>=3.8
+
+# HTTP
+requests>=2.31
