@@ -2,8 +2,9 @@
 
 An AI-assisted security compliance scanner and auto-remediator for source code repositories. It runs a suite of third-party scanners plus custom pattern-based rules across one or many repos, normalizes the findings into a single model, and (once the remediation side is wired up) drafts fixes via the Anthropic Claude API and opens PRs for review.
 
-## Authors Note
-This was a live-build during a Yahoo technical interview. I used Claude as a pair-programming assistant to scaffold the service, then iterated through back-and-forth review. There are still plenty of TODOs before it's a complete service, but this is a working demo as-is.
+## Author's Note
+This was a live-build during a Yahoo technical interview. I used Claude as a pair-programming assistant to scaffold the validator service, then drove the architecture decisions, pushed back on design choices I didn't agree with and iterated until the parts I wanted worked end to end. Scanner and validator work today; parsers and remediation are listed still TODO (listed in Current Status below).
+
 
 ## What this does
 
