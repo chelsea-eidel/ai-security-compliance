@@ -5,6 +5,7 @@ An AI-assisted security compliance scanner and auto-remediator for source code r
 ## Author's Note
 This was a live-build during a Yahoo technical interview. I used Claude as a pair-programming assistant to scaffold the validator service, then drove the architecture decisions, pushed back on design choices I didn't agree with and iterated until the parts I wanted worked end to end. Scanner and validator work today; parsers and remediation are listed still TODO (listed in Current Status below).
 
+
 ## What this does
 
 At a high level:
